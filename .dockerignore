@@ -1,0 +1,11 @@
+.git
+.gitignore
+.idea
+.vscode
+.DS_Store
+*.log
+coverage
+runtime
+resources
+etc/backend.yaml
+etc/backend.local.yaml

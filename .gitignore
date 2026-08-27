@@ -1,0 +1,33 @@
+# binaries and reports
+/kids-planet-be
+/bin/
+/coverage/
+*.out
+*.log
+
+# local configuration and secrets
+/etc/backend.yaml
+/etc/backend.local.yaml
+/etc/backend.docker.local.yaml
+.env
+.env.*
+
+# generated files
+/runtime/**
+!/runtime/generated/
+/runtime/generated/**
+
+# media resources: keep directory placeholders only
+/resources/song/**
+!/resources/song/.gitkeep
+/resources/video/**
+!/resources/video/.gitkeep
+/resources/lyrics/**
+!/resources/lyrics/.gitkeep
+/resources/poster/**
+!/resources/poster/.gitkeep
+
+# editors and operating systems
+.DS_Store
+.idea/
+.vscode/

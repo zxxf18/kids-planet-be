@@ -1,0 +1,77 @@
+syntax = "v1"
+
+info(
+  title: "Kids Media API"
+  desc: "少儿音视频媒体库接口"
+  author: "kids-planet-be"
+)
+
+type (
+  HealthResp {
+    status string `json:"status"`
+    time string `json:"time"`
+  }
+
+  MediaItem {
+    id int64 `json:"id"`
+    sourceCode string `json:"sourceCode"`
+    title string `json:"title"`
+    hasAudio bool `json:"hasAudio"`
+    hasVideo bool `json:"hasVideo"`
+    hasLyric bool `json:"hasLyric"`
+    hasPoster bool `json:"hasPoster"`
+    audioDurationMs int64 `json:"audioDurationMs"`
+    videoDurationMs int64 `json:"videoDurationMs"`
+    width int `json:"width"`
+    height int `json:"height"`
+    validationStatus string `json:"validationStatus"`
+    validationMessage string `json:"validationMessage"`
+    audioUrl string `json:"audioUrl"`
+    videoUrl string `json:"videoUrl"`
+    lyricUrl string `json:"lyricUrl"`
+    posterUrl string `json:"posterUrl"`
+  }
+
+  ListMediaReq {
+    q string `form:"q,optional"`
+    page int `form:"page,optional,default=1"`
+    pageSize int `form:"pageSize,optional,default=30"`
+  }
+
+  ListMediaResp {
+    items []MediaItem `json:"items"`
+    total int64 `json:"total"`
+    page int `json:"page"`
+    pageSize int `json:"pageSize"`
+  }
+
+  ProbeReq {
+    resourcePath string `json:"resourcePath"`
+    extractFirstFrame bool `json:"extractFirstFrame,optional"`
+  }
+
+  ScanReq {
+    resourcePath string `json:"resourcePath,optional"`
+  }
+)
+
+@server(prefix: /api/v1)
+service KidsMedia {
+  @handler health
+  get /healthz returns (HealthResp)
+
+  @handler listMedia
+  get /media (ListMediaReq) returns (ListMediaResp)
+
+  @handler getMedia
+  get /media/:id returns (MediaItem)
+
+  @handler mediaContent
+  get /media/:id/content
+
+  @handler probeResource
+  post /admin/probe (ProbeReq)
+
+  @handler scanResources
+  post /admin/scan (ScanReq)
+}

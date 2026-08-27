@@ -1,0 +1,23 @@
+Name: kids-planet-api
+Host: 0.0.0.0
+Port: 8888
+
+Database:
+  DSN: kids_media:change-me@tcp(mysql:3306)/kids_media?charset=utf8mb4&parseTime=true&loc=Local
+
+Media:
+  ResourceRoot: /data/resources
+  GeneratedRoot: /data/generated
+  FFprobePath: ffprobe
+  FFmpegPath: ffmpeg
+
+Storage:
+  Mode: local
+  MinIO:
+    Endpoint: minio:9000
+    AccessKey: change-me
+    SecretKey: change-me
+    Bucket: kids-media
+    Prefix: ""
+    UseSSL: false
+    URLExpiryMinutes: 60
