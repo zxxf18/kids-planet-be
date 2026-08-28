@@ -1,0 +1,30 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetBucketLocation",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::song",
+        "arn:aws:s3:::video",
+        "arn:aws:s3:::lyr_img",
+        "arn:aws:s3:::poster"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::song/*",
+        "arn:aws:s3:::video/*",
+        "arn:aws:s3:::lyr_img/*",
+        "arn:aws:s3:::poster/*"
+      ]
+    }
+  ]
+}
