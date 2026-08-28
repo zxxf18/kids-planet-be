@@ -58,17 +58,17 @@ CREATE TABLE IF NOT EXISTS media_catalog_tag (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 INSERT INTO media_tag (slug, name, icon, sort_order, min_items) VALUES
-  ('animals', '动物', '🐾', 10, 8),
-  ('numbers', '数字', '🔢', 20, 8),
-  ('colors', '颜色', '🌈', 30, 8),
-  ('holidays', '节日', '🎉', 40, 8),
-  ('vehicles', '交通工具', '🚌', 50, 8),
-  ('bedtime', '睡前', '🌙', 60, 8),
-  ('alphabet', '字母', '🔤', 70, 8),
-  ('movement', '身体与运动', '🕺', 80, 8),
-  ('routines', '生活习惯', '🧼', 90, 8),
-  ('food', '食物', '🍎', 100, 8),
-  ('nature', '自然天气', '🌤️', 110, 8),
-  ('friends', '朋友与问候', '💛', 120, 8)
+  ('animals', '动物', 'animals', 10, 8),
+  ('numbers', '数字', 'numbers', 20, 8),
+  ('colors', '颜色', 'colors', 30, 8),
+  ('holidays', '节日', 'holidays', 40, 8),
+  ('vehicles', '交通工具', 'vehicles', 50, 8),
+  ('bedtime', '睡前', 'bedtime', 60, 8),
+  ('alphabet', '字母', 'alphabet', 70, 8),
+  ('movement', '身体与运动', 'movement', 80, 8),
+  ('routines', '生活习惯', 'routines', 90, 8),
+  ('food', '食物', 'food', 100, 8),
+  ('nature', '自然天气', 'nature', 110, 8),
+  ('friends', '朋友与问候', 'friends', 120, 8)
 ON DUPLICATE KEY UPDATE
   name = VALUES(name), icon = VALUES(icon), sort_order = VALUES(sort_order), min_items = VALUES(min_items);
