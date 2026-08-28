@@ -1,10 +1,42 @@
 package media
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/zxxf18/kids-planet-be/internal/model"
 )
+
+type fakeResourceSource struct {
+	entries []ResourceEntry
+}
+
+func (f fakeResourceSource) ListResources(context.Context, string) ([]ResourceEntry, error) {
+	return f.entries, nil
+}
+
+func (fakeResourceSource) ProbeResource(_ context.Context, kind, key string) (ProbeResult, error) {
+	result := ProbeResult{ResourcePath: key, DurationMS: 1000}
+	if kind == "audio" {
+		result.AudioCodec = "mp3"
+	} else {
+		result.VideoCodec = "h264"
+		result.Width = 1920
+		result.Height = 1080
+	}
+	return result, nil
+}
+
+type captureWriter struct {
+	items []model.UpsertMedia
+}
+
+func (w *captureWriter) Upsert(_ context.Context, item model.UpsertMedia) error {
+	w.items = append(w.items, item)
+	return nil
+}
 
 func TestCleanTitle(t *testing.T) {
 	tests := map[string]string{
@@ -28,7 +60,7 @@ func TestCandidateNeedsPlayableMedia(t *testing.T) {
 	}{
 		{name: "audio only", item: candidate{audio: "song/001.mp3"}, playable: true},
 		{name: "video only", item: candidate{video: "video/001.mp4"}, playable: true},
-		{name: "lyric only", item: candidate{lyric: "lyrics/001.jpg"}, playable: false},
+		{name: "lyric only", item: candidate{lyric: "lyr_img/001.jpg"}, playable: false},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -37,6 +69,30 @@ func TestCandidateNeedsPlayableMedia(t *testing.T) {
 				t.Fatalf("playable = %v, want %v", actual, test.playable)
 			}
 		})
+	}
+}
+
+func TestScannerReadsS3StyleResources(t *testing.T) {
+	source := fakeResourceSource{entries: []ResourceEntry{
+		{Kind: "audio", Key: "001. Five Little Monkeys.mp3", Name: "001. Five Little Monkeys.mp3"},
+		{Kind: "video", Key: "001. Five Little Monkeys.mp4", Name: "001. Five Little Monkeys.mp4"},
+		{Kind: "lyric", Key: "001 Five Little Monkeys.jpg", Name: "001 Five Little Monkeys.jpg"},
+		{Kind: "poster", Key: "001. Five Little Monkeys.jpg", Name: "001. Five Little Monkeys.jpg"},
+	}}
+	writer := &captureWriter{}
+	result, err := NewScanner(source, writer).Scan(context.Background(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Saved != 1 || result.Ready != 1 || len(writer.items) != 1 {
+		t.Fatalf("scan result = %+v, items = %d", result, len(writer.items))
+	}
+	item := writer.items[0]
+	if item.AudioObjectKey == nil || *item.AudioObjectKey != "001. Five Little Monkeys.mp3" {
+		t.Fatalf("audio key = %v", item.AudioObjectKey)
+	}
+	if item.LyricObjectKey == nil || *item.LyricObjectKey != "001 Five Little Monkeys.jpg" {
+		t.Fatalf("lyric key = %v", item.LyricObjectKey)
 	}
 }
 

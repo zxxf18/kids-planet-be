@@ -20,7 +20,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY --from=builder /out/kids-planet-be /app/kids-planet-be
 COPY etc/backend.docker.yaml /app/etc/backend.yaml
-RUN mkdir -p /data/resources/song /data/resources/video /data/resources/lyrics /data/resources/poster /data/generated \
+RUN mkdir -p /data/resources/song /data/resources/video /data/resources/lyr_img /data/resources/poster /data/generated \
     && chown -R appuser:appuser /app /data
 
 USER appuser

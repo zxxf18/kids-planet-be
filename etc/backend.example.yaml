@@ -1,6 +1,7 @@
 Name: kids-media-api
 Host: 127.0.0.1
 Port: 8888
+PublicBasePath: ""
 
 Database:
   DSN: kids_media:change-me@tcp(127.0.0.1:3306)/kids_media?charset=utf8mb4&parseTime=true&loc=Local
@@ -18,7 +19,11 @@ Storage:
     Endpoint: minio.example.com
     AccessKey: change-me
     SecretKey: change-me
-    Bucket: kids-media
     Prefix: ""
     UseSSL: true
     URLExpiryMinutes: 60
+    Buckets:
+      Audio: song
+      Video: video
+      Lyric: lyr_img
+      Poster: poster

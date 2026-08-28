@@ -86,10 +86,24 @@ func (p *Prober) Probe(ctx context.Context, relative string) (ProbeResult, error
 	if !info.Mode().IsRegular() {
 		return ProbeResult{}, fmt.Errorf("resource is not a regular file")
 	}
+	return p.probeInput(ctx, absPath, filepath.ToSlash(relative))
+}
+
+// ProbeURL inspects a media object through an HTTP(S) URL. Production uses a
+// short-lived MinIO URL reachable only inside the Docker network, so scanning
+// never depends on the host's MinIO data directory layout.
+func (p *Prober) ProbeURL(ctx context.Context, rawURL, resourcePath string) (ProbeResult, error) {
+	if !strings.HasPrefix(rawURL, "http://") && !strings.HasPrefix(rawURL, "https://") {
+		return ProbeResult{}, fmt.Errorf("probe URL must use http or https")
+	}
+	return p.probeInput(ctx, rawURL, filepath.ToSlash(resourcePath))
+}
+
+func (p *Prober) probeInput(ctx context.Context, input, resourcePath string) (ProbeResult, error) {
 	cmd := exec.CommandContext(ctx, p.ffprobe,
 		"-v", "error",
 		"-show_entries", "format=duration,format_name:stream=codec_type,codec_name,width,height,sample_rate,channels",
-		"-of", "json", absPath,
+		"-of", "json", input,
 	)
 	out, err := cmd.Output()
 	if err != nil {
@@ -99,7 +113,7 @@ func (p *Prober) Probe(ctx context.Context, relative string) (ProbeResult, error
 	if err := json.Unmarshal(out, &raw); err != nil {
 		return ProbeResult{}, fmt.Errorf("decode ffprobe output: %w", err)
 	}
-	result := ProbeResult{ResourcePath: filepath.ToSlash(relative), FormatName: raw.Format.FormatName}
+	result := ProbeResult{ResourcePath: resourcePath, FormatName: raw.Format.FormatName}
 	if seconds, err := strconv.ParseFloat(raw.Format.Duration, 64); err == nil {
 		result.DurationMS = int64(seconds*1000 + 0.5)
 	}

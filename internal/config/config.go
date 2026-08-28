@@ -4,7 +4,8 @@ import "github.com/zeromicro/go-zero/rest"
 
 type Config struct {
 	rest.RestConf
-	Database struct {
+	PublicBasePath string
+	Database       struct {
 		DSN string
 	}
 	Media struct {
@@ -19,10 +20,15 @@ type Config struct {
 			Endpoint         string
 			AccessKey        string
 			SecretKey        string
-			Bucket           string
 			Prefix           string
 			UseSSL           bool
 			URLExpiryMinutes int
+			Buckets          struct {
+				Audio  string
+				Video  string
+				Lyric  string
+				Poster string
+			}
 		}
 	}
 }

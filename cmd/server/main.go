@@ -19,7 +19,7 @@ var configFile = flag.String("f", "etc/backend.local.yaml", "config file")
 func main() {
 	flag.Parse()
 	var cfg config.Config
-	conf.MustLoad(*configFile, &cfg)
+	conf.MustLoad(*configFile, &cfg, conf.UseEnv())
 	database, err := store.NewMySQL(cfg.Database.DSN)
 	if err != nil {
 		log.Fatal(err)
@@ -33,10 +33,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	scanner := media.NewScanner(prober, database)
+	scanner := media.NewScanner(assets, database)
 	server := rest.MustNewServer(cfg.RestConf)
 	defer server.Stop()
-	httpapi.New(database, prober, scanner, assets).Register(server)
+	httpapi.New(database, prober, scanner, assets, cfg.PublicBasePath).Register(server)
 	fmt.Printf("kids media API listening on %s:%d\n", cfg.Host, cfg.Port)
 	server.Start()
 }

@@ -22,8 +22,8 @@
 !/resources/song/.gitkeep
 /resources/video/**
 !/resources/video/.gitkeep
-/resources/lyrics/**
-!/resources/lyrics/.gitkeep
+/resources/lyr_img/**
+!/resources/lyr_img/.gitkeep
 /resources/poster/**
 !/resources/poster/.gitkeep
 

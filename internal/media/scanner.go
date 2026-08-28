@@ -3,8 +3,7 @@ package media
 import (
 	"context"
 	"fmt"
-	"io/fs"
-	"path/filepath"
+	"path"
 	"regexp"
 	"sort"
 	"strconv"
@@ -19,8 +18,19 @@ type MediaWriter interface {
 	Upsert(ctx context.Context, item model.UpsertMedia) error
 }
 
+type ResourceEntry struct {
+	Kind string
+	Key  string
+	Name string
+}
+
+type ResourceSource interface {
+	ListResources(ctx context.Context, subPath string) ([]ResourceEntry, error)
+	ProbeResource(ctx context.Context, kind, key string) (ProbeResult, error)
+}
+
 type Scanner struct {
-	prober *Prober
+	source ResourceSource
 	writer MediaWriter
 }
 
@@ -57,66 +67,42 @@ type namedImageCandidate struct {
 	title string
 }
 
-func NewScanner(prober *Prober, writer MediaWriter) *Scanner {
-	return &Scanner{prober: prober, writer: writer}
+func NewScanner(source ResourceSource, writer MediaWriter) *Scanner {
+	return &Scanner{source: source, writer: writer}
 }
 
 func (s *Scanner) Scan(ctx context.Context, subPath string) (ScanResult, error) {
-	base, err := s.prober.ResolveResource(subPath)
+	entries, err := s.source.ListResources(ctx, subPath)
 	if err != nil {
 		return ScanResult{}, err
 	}
 	items := map[int]*candidate{}
 	images := make([]namedImageCandidate, 0)
 	result := ScanResult{Issues: make([]ScanIssue, 0)}
-	err = filepath.WalkDir(base, func(path string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			result.Issues = append(result.Issues, ScanIssue{Path: path, Message: walkErr.Error()})
-			return nil
-		}
-		name := entry.Name()
+	for _, entry := range entries {
+		name := entry.Name
 		if strings.HasPrefix(name, ".") {
-			if entry.IsDir() && path != base {
-				return filepath.SkipDir
-			}
-			return nil
+			continue
 		}
-		if entry.IsDir() {
-			return nil
-		}
-		ext := strings.ToLower(filepath.Ext(name))
-		kind := ""
-		switch ext {
-		case ".mp3":
-			kind = "audio"
-		case ".mp4":
-			kind = "video"
-		case ".jpg", ".jpeg":
-			parent := strings.ToLower(filepath.Base(filepath.Dir(path)))
-			if parent == "poster" || parent == "cover" || parent == "covers" {
-				kind = "poster"
-			} else {
-				kind = "lyric"
-			}
-		default:
-			return nil
+		kind := entry.Kind
+		if kind != "audio" && kind != "video" && kind != "lyric" && kind != "poster" {
+			continue
 		}
 		match := leadingNumber.FindStringSubmatch(name)
 		if len(match) != 2 {
-			result.Issues = append(result.Issues, ScanIssue{Path: path, Message: "文件名缺少前导数字编号"})
-			return nil
+			result.Issues = append(result.Issues, ScanIssue{Path: entry.Key, Message: "文件名缺少前导数字编号"})
+			continue
 		}
 		no, parseErr := strconv.Atoi(match[1])
 		if parseErr != nil {
-			result.Issues = append(result.Issues, ScanIssue{Path: path, Message: "文件编号无效"})
-			return nil
+			result.Issues = append(result.Issues, ScanIssue{Path: entry.Key, Message: "文件编号无效"})
+			continue
 		}
-		relative, _ := filepath.Rel(s.prober.Root(), path)
-		relative = filepath.ToSlash(relative)
-		title := cleanTitle(strings.TrimSuffix(name, filepath.Ext(name)))
+		relative := entry.Key
+		title := cleanTitle(strings.TrimSuffix(name, path.Ext(name)))
 		if kind == "lyric" || kind == "poster" {
 			images = append(images, namedImageCandidate{no: no, code: match[1], kind: kind, path: relative, title: title})
-			return nil
+			continue
 		}
 		item := items[no]
 		if item == nil {
@@ -130,10 +116,6 @@ func (s *Scanner) Scan(ctx context.Context, subPath string) (ScanResult, error) 
 		case "video":
 			item.video = relative
 		}
-		return nil
-	})
-	if err != nil {
-		return ScanResult{}, err
 	}
 	for _, image := range images {
 		item := matchNamedImage(items, image)
@@ -292,7 +274,7 @@ func (s *Scanner) inspectCandidate(ctx context.Context, item *candidate) (model.
 		record.ValidationStatus = "partial"
 	}
 	if item.audio != "" {
-		probe, err := s.prober.Probe(ctx, item.audio)
+		probe, err := s.source.ProbeResource(ctx, "audio", item.audio)
 		if err != nil {
 			issues = append(issues, "音频校验失败: "+err.Error())
 			record.ValidationStatus = "invalid"
@@ -302,7 +284,7 @@ func (s *Scanner) inspectCandidate(ctx context.Context, item *candidate) (model.
 		}
 	}
 	if item.video != "" {
-		probe, err := s.prober.Probe(ctx, item.video)
+		probe, err := s.source.ProbeResource(ctx, "video", item.video)
 		if err != nil {
 			issues = append(issues, "视频校验失败: "+err.Error())
 			record.ValidationStatus = "invalid"

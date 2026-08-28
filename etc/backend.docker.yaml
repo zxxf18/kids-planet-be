@@ -1,9 +1,10 @@
 Name: kids-planet-api
 Host: 0.0.0.0
 Port: 8888
+PublicBasePath: /kidstar
 
 Database:
-  DSN: kids_media:change-me@tcp(mysql:3306)/kids_media?charset=utf8mb4&parseTime=true&loc=Local
+  DSN: ${KIDS_DB_DSN}
 
 Media:
   ResourceRoot: /data/resources
@@ -12,12 +13,16 @@ Media:
   FFmpegPath: ffmpeg
 
 Storage:
-  Mode: local
+  Mode: minio
   MinIO:
     Endpoint: minio:9000
-    AccessKey: change-me
-    SecretKey: change-me
-    Bucket: kids-media
+    AccessKey: ${KIDS_MINIO_ACCESS_KEY}
+    SecretKey: ${KIDS_MINIO_SECRET_KEY}
     Prefix: ""
     UseSSL: false
     URLExpiryMinutes: 60
+    Buckets:
+      Audio: song
+      Video: video
+      Lyric: lyr_img
+      Poster: poster

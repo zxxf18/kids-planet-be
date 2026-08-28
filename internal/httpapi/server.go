@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -19,14 +21,22 @@ import (
 )
 
 type API struct {
-	store   *store.MySQL
-	prober  *media.Prober
-	scanner *media.Scanner
-	assets  *storage.Assets
+	store          *store.MySQL
+	prober         *media.Prober
+	scanner        *media.Scanner
+	assets         *storage.Assets
+	publicBasePath string
 }
 
-func New(store *store.MySQL, prober *media.Prober, scanner *media.Scanner, assets *storage.Assets) *API {
-	return &API{store: store, prober: prober, scanner: scanner, assets: assets}
+func New(store *store.MySQL, prober *media.Prober, scanner *media.Scanner, assets *storage.Assets, publicBasePath string) *API {
+	publicBasePath = strings.Trim(publicBasePath, "/")
+	if publicBasePath != "" {
+		publicBasePath = "/" + publicBasePath
+	}
+	return &API{
+		store: store, prober: prober, scanner: scanner, assets: assets,
+		publicBasePath: publicBasePath,
+	}
 }
 
 func (a *API) Register(server *rest.Server) {
@@ -39,7 +49,7 @@ func (a *API) Register(server *rest.Server) {
 	})
 	server.AddRoute(
 		rest.Route{Method: http.MethodPost, Path: "/api/v1/admin/scan", Handler: a.scanResources},
-		rest.WithTimeout(10*time.Minute),
+		rest.WithTimeout(30*time.Minute),
 	)
 }
 
@@ -60,7 +70,7 @@ func (a *API) listMedia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for i := range items {
-		attachURLs(&items[i])
+		a.attachURLs(&items[i])
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items, "total": total, "page": page, "pageSize": pageSize})
 }
@@ -70,7 +80,7 @@ func (a *API) getMedia(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	attachURLs(&item)
+	a.attachURLs(&item)
 	writeJSON(w, http.StatusOK, item)
 }
 
@@ -94,12 +104,21 @@ func (a *API) mediaContent(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, localPath)
 		return
 	}
-	url, err := a.assets.PresignedURL(r.Context(), key)
+	object, info, err := a.assets.Open(r.Context(), kind, key)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	http.Redirect(w, r, url.String(), http.StatusTemporaryRedirect)
+	defer object.Close()
+	contentType := info.ContentType
+	if contentType == "" || contentType == "application/octet-stream" {
+		contentType = mime.TypeByExtension(path.Ext(key))
+	}
+	if contentType != "" {
+		w.Header().Set("Content-Type", contentType)
+	}
+	w.Header().Set("Accept-Ranges", "bytes")
+	http.ServeContent(w, r, path.Base(key), info.LastModified, object)
 }
 
 func (a *API) probeResource(w http.ResponseWriter, r *http.Request) {
@@ -172,8 +191,8 @@ func (a *API) loadMedia(w http.ResponseWriter, r *http.Request) (model.MediaItem
 	return item, true
 }
 
-func attachURLs(item *model.MediaItem) {
-	base := fmt.Sprintf("/api/v1/media/%d/content?kind=", item.ID)
+func (a *API) attachURLs(item *model.MediaItem) {
+	base := fmt.Sprintf("%s/api/v1/media/%d/content?kind=", a.publicBasePath, item.ID)
 	if item.HasAudio {
 		item.AudioURL = base + "audio"
 	}
