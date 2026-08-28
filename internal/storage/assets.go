@@ -39,7 +39,7 @@ func NewAssets(cfg config.Config, prober *media.Prober) (*Assets, error) {
 		buckets: map[string]string{
 			"audio":  cfg.Storage.MinIO.Buckets.Audio,
 			"video":  cfg.Storage.MinIO.Buckets.Video,
-			"lyric":  cfg.Storage.MinIO.Buckets.Lyric,
+			"lyrics": cfg.Storage.MinIO.Buckets.Lyrics,
 			"poster": cfg.Storage.MinIO.Buckets.Poster,
 		},
 	}
@@ -56,7 +56,8 @@ func NewAssets(cfg config.Config, prober *media.Prober) (*Assets, error) {
 	if cfg.Storage.MinIO.Endpoint == "" || cfg.Storage.MinIO.AccessKey == "" || cfg.Storage.MinIO.SecretKey == "" {
 		return nil, fmt.Errorf("minio mode requires endpoint, access key and secret key")
 	}
-	for kind, bucket := range assets.buckets {
+	for _, kind := range []string{"audio", "video", "lyrics", "poster"} {
+		bucket := assets.buckets[kind]
 		if strings.TrimSpace(bucket) == "" {
 			return nil, fmt.Errorf("minio mode requires a bucket for %s", kind)
 		}
@@ -127,7 +128,7 @@ func (a *Assets) ListResources(ctx context.Context, subPath string) ([]media.Res
 		return a.listLocal(cleanSubPath)
 	}
 	entries := make([]media.ResourceEntry, 0, 1024)
-	for _, kind := range []string{"audio", "video", "lyric", "poster"} {
+	for _, kind := range []string{"audio", "video", "lyrics", "poster"} {
 		bucket := a.bucket(kind)
 		listPrefix := a.objectKey(cleanSubPath)
 		for object := range a.minio.ListObjects(ctx, bucket, minio.ListObjectsOptions{Prefix: listPrefix, Recursive: true}) {
@@ -202,11 +203,13 @@ func localKind(key string) string {
 		return "audio"
 	case ".mp4":
 		return "video"
+	case ".lrc", ".txt":
+		return "lyrics"
 	case ".jpg", ".jpeg", ".png", ".webp":
 		if parent == "poster" || parent == "cover" || parent == "covers" {
 			return "poster"
 		}
-		return "lyric"
+		return ""
 	default:
 		return ""
 	}

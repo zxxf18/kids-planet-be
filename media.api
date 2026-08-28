@@ -16,9 +16,10 @@ type (
     id int64 `json:"id"`
     sourceCode string `json:"sourceCode"`
     title string `json:"title"`
+    titleZh string `json:"titleZh"`
     hasAudio bool `json:"hasAudio"`
     hasVideo bool `json:"hasVideo"`
-    hasLyric bool `json:"hasLyric"`
+    hasLyrics bool `json:"hasLyrics"`
     hasPoster bool `json:"hasPoster"`
     audioDurationMs int64 `json:"audioDurationMs"`
     videoDurationMs int64 `json:"videoDurationMs"`
@@ -28,12 +29,14 @@ type (
     validationMessage string `json:"validationMessage"`
     audioUrl string `json:"audioUrl"`
     videoUrl string `json:"videoUrl"`
-    lyricUrl string `json:"lyricUrl"`
+    lyricsUrl string `json:"lyricsUrl"`
     posterUrl string `json:"posterUrl"`
   }
 
   ListMediaReq {
     q string `form:"q,optional"`
+    tag string `form:"tag,optional"`
+    ids string `form:"ids,optional"`
     page int `form:"page,optional,default=1"`
     pageSize int `form:"pageSize,optional,default=30"`
   }

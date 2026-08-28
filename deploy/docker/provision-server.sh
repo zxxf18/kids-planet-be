@@ -3,11 +3,15 @@ set -eu
 
 config_dir=/root/config/kids-planet
 schema_file=${1:-$config_dir/schema.sql}
+catalog_file=${2:-$(dirname "$schema_file")/catalog_seed.sql}
 env_file=$config_dir/backend.env
 policy_file=$config_dir/minio-readonly-policy.json
 mc_image=minio/mc:RELEASE.2021-04-22T17-40-00Z
+be_image=${KIDS_BE_IMAGE:-kids-planet-be:20260828-catalog-lyrics}
+fe_image=${KIDS_FE_IMAGE:-kids-planet-fe:20260828-catalog-lyrics}
 
 test -f "$schema_file"
+test -f "$catalog_file"
 test -f "$policy_file"
 docker network inspect services-net >/dev/null
 docker inspect mysql >/dev/null
@@ -15,8 +19,11 @@ docker inspect minio >/dev/null
 
 install -d -m 700 "$config_dir"
 
-# The schema is idempotent and is applied with the existing MySQL root account.
-docker exec -i mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD"' < "$schema_file"
+# This release intentionally replaces the old schema instead of carrying a
+# compatibility migration. Media objects remain in MinIO and are rescanned.
+docker exec mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "DROP DATABASE IF EXISTS kids_media"'
+docker exec -i mysql sh -c 'mysql --default-character-set=utf8mb4 -uroot -p"$MYSQL_ROOT_PASSWORD"' < "$schema_file"
+docker exec -i mysql sh -c 'mysql --default-character-set=utf8mb4 -uroot -p"$MYSQL_ROOT_PASSWORD" kids_media' < "$catalog_file"
 
 db_password=$(openssl rand -hex 24)
 db_sql=$(printf "%s" "CREATE USER IF NOT EXISTS 'kids_media'@'%' IDENTIFIED BY '$db_password'; ALTER USER 'kids_media'@'%' IDENTIFIED BY '$db_password'; GRANT SELECT, INSERT, UPDATE, DELETE ON kids_media.* TO 'kids_media'@'%'; FLUSH PRIVILEGES;")
@@ -56,11 +63,11 @@ docker run -d \
   --network services-net \
   --restart unless-stopped \
   --env-file "$env_file" \
-  kids-planet-be:20260828-s3-kidstar >/dev/null
+  "$be_image" >/dev/null
 docker run -d \
   --name kids-planet-fe \
   --network services-net \
   --restart unless-stopped \
-  kids-planet-fe:20260828-kidstar >/dev/null
+  "$fe_image" >/dev/null
 
 docker image rm "$mc_image" >/dev/null 2>&1 || true

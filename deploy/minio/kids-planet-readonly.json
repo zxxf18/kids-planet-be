@@ -10,7 +10,7 @@
       "Resource": [
         "arn:aws:s3:::song",
         "arn:aws:s3:::video",
-        "arn:aws:s3:::lyr_img",
+        "arn:aws:s3:::lyrs",
         "arn:aws:s3:::poster"
       ]
     },
@@ -22,7 +22,7 @@
       "Resource": [
         "arn:aws:s3:::song/*",
         "arn:aws:s3:::video/*",
-        "arn:aws:s3:::lyr_img/*",
+        "arn:aws:s3:::lyrs/*",
         "arn:aws:s3:::poster/*"
       ]
     }

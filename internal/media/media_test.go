@@ -60,7 +60,7 @@ func TestCandidateNeedsPlayableMedia(t *testing.T) {
 	}{
 		{name: "audio only", item: candidate{audio: "song/001.mp3"}, playable: true},
 		{name: "video only", item: candidate{video: "video/001.mp4"}, playable: true},
-		{name: "lyric only", item: candidate{lyric: "lyr_img/001.jpg"}, playable: false},
+		{name: "lyrics only", item: candidate{lyrics: "lyrs/001.lrc"}, playable: false},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -76,7 +76,7 @@ func TestScannerReadsS3StyleResources(t *testing.T) {
 	source := fakeResourceSource{entries: []ResourceEntry{
 		{Kind: "audio", Key: "001. Five Little Monkeys.mp3", Name: "001. Five Little Monkeys.mp3"},
 		{Kind: "video", Key: "001. Five Little Monkeys.mp4", Name: "001. Five Little Monkeys.mp4"},
-		{Kind: "lyric", Key: "001 Five Little Monkeys.jpg", Name: "001 Five Little Monkeys.jpg"},
+		{Kind: "lyrics", Key: "001. Five Little Monkeys.lrc", Name: "001. Five Little Monkeys.lrc"},
 		{Kind: "poster", Key: "001. Five Little Monkeys.jpg", Name: "001. Five Little Monkeys.jpg"},
 	}}
 	writer := &captureWriter{}
@@ -91,8 +91,8 @@ func TestScannerReadsS3StyleResources(t *testing.T) {
 	if item.AudioObjectKey == nil || *item.AudioObjectKey != "001. Five Little Monkeys.mp3" {
 		t.Fatalf("audio key = %v", item.AudioObjectKey)
 	}
-	if item.LyricObjectKey == nil || *item.LyricObjectKey != "001 Five Little Monkeys.jpg" {
-		t.Fatalf("lyric key = %v", item.LyricObjectKey)
+	if item.LyricsObjectKey == nil || *item.LyricsObjectKey != "001. Five Little Monkeys.lrc" {
+		t.Fatalf("lyrics key = %v", item.LyricsObjectKey)
 	}
 }
 
@@ -114,7 +114,7 @@ func TestMatchNamedImageUsesTitleBeforeSourceNumber(t *testing.T) {
 	}
 }
 
-func TestMatchPosterUsesSourceNumberWhenTitlesRepeat(t *testing.T) {
+func TestMatchNamedResourceUsesSourceNumberWhenTitlesRepeat(t *testing.T) {
 	items := map[int]*candidate{
 		10:  {no: 10, code: "010", audio: "song/010.mp3", titles: map[string]string{"audio": "Open Shut Them"}},
 		171: {no: 171, code: "171", audio: "song/171.mp3", titles: map[string]string{"audio": "Open Shut Them"}},

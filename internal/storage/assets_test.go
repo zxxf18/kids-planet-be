@@ -19,3 +19,9 @@ func TestLocalPosterUsesResourceRoot(t *testing.T) {
 		t.Fatalf("poster path = %q, want %q", actual, expected)
 	}
 }
+
+func TestLocalKindUsesTextLyrics(t *testing.T) {
+	if actual := localKind("lyrs/001. Song.lrc"); actual != "lyrics" {
+		t.Fatalf("lrc kind = %q, want lyrics", actual)
+	}
+}

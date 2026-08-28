@@ -54,7 +54,7 @@ type candidate struct {
 	code   string
 	audio  string
 	video  string
-	lyric  string
+	lyrics string
 	poster string
 	titles map[string]string
 }
@@ -81,12 +81,18 @@ func (s *Scanner) Scan(ctx context.Context, subPath string) (ScanResult, error) 
 	result := ScanResult{Issues: make([]ScanIssue, 0)}
 	for _, entry := range entries {
 		name := entry.Name
-		if strings.HasPrefix(name, ".") {
+		if strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") {
 			continue
 		}
 		kind := entry.Kind
-		if kind != "audio" && kind != "video" && kind != "lyric" && kind != "poster" {
+		if kind != "audio" && kind != "video" && kind != "lyrics" && kind != "poster" {
 			continue
+		}
+		if kind == "lyrics" {
+			ext := strings.ToLower(path.Ext(name))
+			if ext != ".lrc" && ext != ".txt" {
+				continue
+			}
 		}
 		match := leadingNumber.FindStringSubmatch(name)
 		if len(match) != 2 {
@@ -100,7 +106,7 @@ func (s *Scanner) Scan(ctx context.Context, subPath string) (ScanResult, error) 
 		}
 		relative := entry.Key
 		title := cleanTitle(strings.TrimSuffix(name, path.Ext(name)))
-		if kind == "lyric" || kind == "poster" {
+		if kind == "lyrics" || kind == "poster" {
 			images = append(images, namedImageCandidate{no: no, code: match[1], kind: kind, path: relative, title: title})
 			continue
 		}
@@ -119,7 +125,7 @@ func (s *Scanner) Scan(ctx context.Context, subPath string) (ScanResult, error) 
 	}
 	for _, image := range images {
 		item := matchNamedImage(items, image)
-		label := "歌词图片"
+		label := "文字歌词"
 		if image.kind == "poster" {
 			label = "封面图片"
 		}
@@ -131,7 +137,7 @@ func (s *Scanner) Scan(ctx context.Context, subPath string) (ScanResult, error) 
 			})
 			continue
 		}
-		current := &item.lyric
+		current := &item.lyrics
 		if image.kind == "poster" {
 			current = &item.poster
 		}
@@ -152,8 +158,8 @@ func (s *Scanner) Scan(ctx context.Context, subPath string) (ScanResult, error) 
 		}
 		result.Issues = append(result.Issues, ScanIssue{
 			SourceCode: item.code,
-			Path:       item.lyric,
-			Message:    "仅有歌词图片，缺少可播放的音频或视频，已忽略",
+			Path:       item.lyrics,
+			Message:    "仅有配套资源，缺少可播放的音频或视频，已忽略",
 		})
 		delete(items, no)
 	}
@@ -191,19 +197,10 @@ func hasPlayableMedia(item *candidate) bool {
 }
 
 func matchNamedImage(items map[int]*candidate, image namedImageCandidate) *candidate {
-	title := normalizeTitle(image.title)
-	if image.kind == "poster" {
-		item := items[image.no]
-		if item == nil {
-			return nil
-		}
-		for _, kind := range []string{"audio", "video"} {
-			if title != "" && normalizeTitle(item.titles[kind]) == title {
-				return item
-			}
-		}
-		return nil
+	if image.kind == "poster" || image.kind == "lyrics" {
+		return items[image.no]
 	}
+	title := normalizeTitle(image.title)
 	numbers := make([]int, 0, len(items))
 	for no := range items {
 		numbers = append(numbers, no)
@@ -268,9 +265,10 @@ func (s *Scanner) inspectCandidate(ctx context.Context, item *candidate) (model.
 	record := model.UpsertMedia{
 		SourceNo: item.no, SourceCode: item.code, Title: chooseTitle(item),
 		AudioObjectKey: optionalString(item.audio), VideoObjectKey: optionalString(item.video),
-		LyricObjectKey: optionalString(item.lyric), PosterObjectKey: optionalString(item.poster), ValidationStatus: "ready",
+		LyricsObjectKey: optionalString(item.lyrics),
+		PosterObjectKey: optionalString(item.poster), ValidationStatus: "ready",
 	}
-	if item.audio == "" || item.video == "" || item.lyric == "" {
+	if item.audio == "" || item.video == "" || item.lyrics == "" || item.poster == "" {
 		record.ValidationStatus = "partial"
 	}
 	if item.audio != "" {
@@ -305,11 +303,15 @@ func cleanTitle(stem string) string {
 	if stem == "" {
 		return "未命名儿歌"
 	}
+	stem = strings.NewReplacer(
+		",s", "'s", ",re", "'re", ",m", "'m", ",t", "'t", ",ve", "'ve", ",ll", "'ll", ",d", "'d",
+		"，s", "'s", "，re", "'re", "，m", "'m", "，t", "'t", "？", "?",
+	).Replace(stem)
 	return stem
 }
 
 func chooseTitle(item *candidate) string {
-	for _, kind := range []string{"audio", "video", "lyric"} {
+	for _, kind := range []string{"audio", "video", "lyrics"} {
 		if title := strings.TrimSpace(item.titles[kind]); title != "" {
 			return title
 		}

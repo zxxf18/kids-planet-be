@@ -12,7 +12,7 @@
    resources/
      song/      *.mp3
      video/     *.mp4
-     lyr_img/   *.jpg
+     lyrs/      *.lrc|*.txt
      poster/    *.jpg
    ```
 
@@ -41,14 +41,14 @@ go test ./...
 docker build -t kids-planet-be .
 cp etc/backend.docker.yaml etc/backend.docker.local.yaml
 # 编辑 backend.docker.local.yaml，填写容器网络中的 MySQL/MinIO 地址和凭据。
-# 生产模式通过 S3 API 访问 song、video、lyr_img、poster 四个 Bucket，
+# 生产模式通过 S3 API 访问 song、video、lyrs、poster 四个 Bucket，
 # 不应挂载或读取 MinIO 的宿主机数据目录。
 docker run --rm -p 8888:8888 \
   -v "$PWD/etc/backend.docker.local.yaml:/app/etc/backend.yaml:ro" \
   kids-planet-be
 ```
 
-生产镜像通过 `KIDS_DB_DSN`、`KIDS_MINIO_ACCESS_KEY` 和 `KIDS_MINIO_SECRET_KEY` 环境变量注入凭据，不要把真实值写入镜像或仓库。`deploy/sql/schema.sql` 是可重复执行的数据库初始化脚本。管理接口 `/api/v1/admin/*` 应限制在可信内网。
+生产镜像通过 `KIDS_DB_DSN`、`KIDS_MINIO_ACCESS_KEY` 和 `KIDS_MINIO_SECRET_KEY` 环境变量注入凭据，不要把真实值写入镜像或仓库。初始化时依次执行 `deploy/sql/schema.sql` 和 `deploy/sql/catalog_seed.sql`；后者包含 426 首中文名和主题标签，不包含媒体资源。管理接口 `/api/v1/admin/*` 应限制在可信内网。
 
 ## License
 

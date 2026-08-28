@@ -43,8 +43,10 @@ func (a *API) Register(server *rest.Server) {
 	server.AddRoutes([]rest.Route{
 		{Method: http.MethodGet, Path: "/api/v1/healthz", Handler: a.health},
 		{Method: http.MethodGet, Path: "/api/v1/media", Handler: a.listMedia},
+		{Method: http.MethodGet, Path: "/api/v1/tags", Handler: a.listTags},
 		{Method: http.MethodGet, Path: "/api/v1/media/:id", Handler: a.getMedia},
 		{Method: http.MethodGet, Path: "/api/v1/media/:id/content", Handler: a.mediaContent},
+		{Method: http.MethodHead, Path: "/api/v1/media/:id/content", Handler: a.mediaContent},
 		{Method: http.MethodPost, Path: "/api/v1/admin/probe", Handler: a.probeResource},
 	})
 	server.AddRoute(
@@ -64,7 +66,17 @@ func (a *API) health(w http.ResponseWriter, r *http.Request) {
 func (a *API) listMedia(w http.ResponseWriter, r *http.Request) {
 	page := intQuery(r, "page", 1)
 	pageSize := intQuery(r, "pageSize", 30)
-	items, total, err := a.store.List(r.Context(), r.URL.Query().Get("q"), page, pageSize)
+	if pageSize > 50 {
+		pageSize = 50
+	}
+	ids, err := parseIDs(r.URL.Query().Get("ids"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	items, total, err := a.store.List(r.Context(), store.ListFilter{
+		Query: r.URL.Query().Get("q"), Tag: r.URL.Query().Get("tag"), IDs: ids,
+	}, page, pageSize)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -73,6 +85,15 @@ func (a *API) listMedia(w http.ResponseWriter, r *http.Request) {
 		a.attachURLs(&items[i])
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items, "total": total, "page": page, "pageSize": pageSize})
+}
+
+func (a *API) listTags(w http.ResponseWriter, r *http.Request) {
+	tags, err := a.store.ListTags(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": tags})
 }
 
 func (a *API) getMedia(w http.ResponseWriter, r *http.Request) {
@@ -95,6 +116,10 @@ func (a *API) mediaContent(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "requested media type is unavailable")
 		return
 	}
+	if kind == "lyrics" {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+	}
 	if a.assets.IsLocal() {
 		localPath, err := a.assets.LocalPath(kind, key)
 		if err != nil {
@@ -114,8 +139,18 @@ func (a *API) mediaContent(w http.ResponseWriter, r *http.Request) {
 	if contentType == "" || contentType == "application/octet-stream" {
 		contentType = mime.TypeByExtension(path.Ext(key))
 	}
-	if contentType != "" {
+	if contentType != "" && kind != "lyrics" {
 		w.Header().Set("Content-Type", contentType)
+	}
+	if info.ETag != "" {
+		w.Header().Set("ETag", `"`+strings.Trim(info.ETag, `"`)+`"`)
+	}
+	if kind == "poster" {
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+	} else if kind == "lyrics" {
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+	} else {
+		w.Header().Set("Cache-Control", "public, max-age=3600")
 	}
 	w.Header().Set("Accept-Ranges", "bytes")
 	http.ServeContent(w, r, path.Base(key), info.LastModified, object)
@@ -199,8 +234,8 @@ func (a *API) attachURLs(item *model.MediaItem) {
 	if item.HasVideo {
 		item.VideoURL = base + "video"
 	}
-	if item.HasLyric {
-		item.LyricURL = base + "lyric"
+	if item.HasLyrics {
+		item.LyricsURL = base + "lyrics"
 	}
 	if item.HasPoster {
 		item.PosterURL = base + "poster"
@@ -214,8 +249,8 @@ func objectKey(item model.MediaItem, kind string) string {
 		value = item.AudioObjectKey
 	case "video":
 		value = item.VideoObjectKey
-	case "lyric":
-		value = item.LyricObjectKey
+	case "lyrics":
+		value = item.LyricsObjectKey
 	case "poster":
 		value = item.PosterObjectKey
 	default:
@@ -225,6 +260,30 @@ func objectKey(item model.MediaItem, kind string) string {
 		return ""
 	}
 	return *value
+}
+
+func parseIDs(value string) ([]int64, error) {
+	if strings.TrimSpace(value) == "" {
+		return nil, nil
+	}
+	parts := strings.Split(value, ",")
+	if len(parts) > 500 {
+		return nil, fmt.Errorf("ids supports at most 500 values")
+	}
+	result := make([]int64, 0, len(parts))
+	seen := make(map[int64]struct{}, len(parts))
+	for _, part := range parts {
+		id, err := strconv.ParseInt(strings.TrimSpace(part), 10, 64)
+		if err != nil || id < 1 {
+			return nil, fmt.Errorf("invalid media id in ids")
+		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		result = append(result, id)
+	}
+	return result, nil
 }
 
 func intQuery(r *http.Request, name string, fallback int) int {

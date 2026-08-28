@@ -26,7 +26,7 @@ type Config struct {
 			Buckets          struct {
 				Audio  string
 				Video  string
-				Lyric  string
+				Lyrics string
 				Poster string
 			}
 		}
