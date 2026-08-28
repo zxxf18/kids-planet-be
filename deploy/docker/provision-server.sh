@@ -4,6 +4,7 @@ set -eu
 config_dir=/root/config/kids-planet
 schema_file=${1:-$config_dir/schema.sql}
 env_file=$config_dir/backend.env
+mc_image=minio/mc:RELEASE.2021-04-22T17-40-00Z
 
 test -f "$schema_file"
 docker network inspect services-net >/dev/null
@@ -34,10 +35,9 @@ docker run --rm --network services-net \
   -e "MC_HOST_local=$mc_host" \
   -e "APP_ACCESS_KEY=$app_access_key" \
   -e "APP_SECRET_KEY=$app_secret_key" \
-  --entrypoint /bin/sh minio/mc:latest -c \
+  --entrypoint /bin/sh "$mc_image" -c \
   'mc admin user add local "$APP_ACCESS_KEY" "$APP_SECRET_KEY" >/dev/null &&
-   (mc admin policy attach local readonly --user "$APP_ACCESS_KEY" >/dev/null 2>&1 ||
-    mc admin policy set local readonly user="$APP_ACCESS_KEY" >/dev/null)'
+   mc admin policy set local readonly user="$APP_ACCESS_KEY" >/dev/null'
 
 umask 077
 {
@@ -59,4 +59,4 @@ docker run -d \
   --restart unless-stopped \
   kids-planet-fe:20260828-kidstar >/dev/null
 
-docker image rm minio/mc:latest >/dev/null 2>&1 || true
+docker image rm "$mc_image" >/dev/null 2>&1 || true
