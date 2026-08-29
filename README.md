@@ -11,9 +11,12 @@
    ```text
    resources/
      song/      *.mp3
-     video/     *.mp4
-     lyrs/      *.lrc|*.txt
-     poster/    *.jpg
+     video_480/       *.mp4
+     video_720/       *.mp4
+     lyrs/            *.lrc|*.txt
+     lyrs_zh/         *.lrc|*.txt
+     lyrs_bilingual/  *.lrc|*.txt
+     poster/          *.jpg
    ```
 
 4. 启动服务：
@@ -41,7 +44,8 @@ go test ./...
 docker build -t kids-planet-be .
 cp etc/backend.docker.yaml etc/backend.docker.local.yaml
 # 编辑 backend.docker.local.yaml，填写容器网络中的 MySQL/MinIO 地址和凭据。
-# 生产模式通过 S3 API 访问 song、video、lyrs、poster 四个 Bucket，
+# 生产模式通过 S3 API 访问 song、video-480、video-720、lyrs、
+# lyrs-zh、lyrs-bilingual、poster 七个 Bucket，
 # 不应挂载或读取 MinIO 的宿主机数据目录。
 docker run --rm -p 8888:8888 \
   -v "$PWD/etc/backend.docker.local.yaml:/app/etc/backend.yaml:ro" \

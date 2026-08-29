@@ -34,7 +34,8 @@ func (s *MySQL) Close() error { return s.db.Close() }
 func (s *MySQL) Ping(ctx context.Context) error { return s.db.PingContext(ctx) }
 
 const mediaColumns = `m.id, m.source_no, m.source_code, m.title,
- COALESCE(c.title_zh, ''), m.audio_object_key, m.video_object_key, m.lyrics_object_key, m.poster_object_key,
+ COALESCE(c.title_zh, ''), m.audio_object_key, m.video_480_object_key, m.video_720_object_key,
+ m.lyrics_en_object_key, m.lyrics_zh_object_key, m.lyrics_bilingual_object_key, m.poster_object_key,
  m.audio_duration_ms, m.video_duration_ms, m.video_width, m.video_height,
  m.audio_codec, m.video_codec, m.validation_status, COALESCE(m.validation_message, ''),
  m.created_at, m.updated_at`
@@ -128,20 +129,24 @@ func (s *MySQL) Get(ctx context.Context, id int64) (model.MediaItem, error) {
 
 func (s *MySQL) Upsert(ctx context.Context, item model.UpsertMedia) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO media_item (
-	 source_no, source_code, title, audio_object_key, video_object_key, lyrics_object_key,
+	 source_no, source_code, title, audio_object_key, video_480_object_key, video_720_object_key,
+	 lyrics_en_object_key, lyrics_zh_object_key, lyrics_bilingual_object_key,
  poster_object_key, audio_duration_ms, video_duration_ms, video_width, video_height,
  audio_codec, video_codec, validation_status, validation_message
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON DUPLICATE KEY UPDATE
  source_code = VALUES(source_code), title = VALUES(title),
-	 audio_object_key = VALUES(audio_object_key), video_object_key = VALUES(video_object_key),
-	 lyrics_object_key = VALUES(lyrics_object_key), poster_object_key = VALUES(poster_object_key),
+	 audio_object_key = VALUES(audio_object_key), video_480_object_key = VALUES(video_480_object_key),
+	 video_720_object_key = VALUES(video_720_object_key), lyrics_en_object_key = VALUES(lyrics_en_object_key),
+	 lyrics_zh_object_key = VALUES(lyrics_zh_object_key), lyrics_bilingual_object_key = VALUES(lyrics_bilingual_object_key),
+	 poster_object_key = VALUES(poster_object_key),
  audio_duration_ms = VALUES(audio_duration_ms), video_duration_ms = VALUES(video_duration_ms),
  video_width = VALUES(video_width), video_height = VALUES(video_height),
  audio_codec = VALUES(audio_codec), video_codec = VALUES(video_codec),
  validation_status = VALUES(validation_status), validation_message = VALUES(validation_message)`,
-		item.SourceNo, item.SourceCode, item.Title, item.AudioObjectKey, item.VideoObjectKey,
-		item.LyricsObjectKey, item.PosterObjectKey, item.AudioDurationMS, item.VideoDurationMS,
+		item.SourceNo, item.SourceCode, item.Title, item.AudioObjectKey, item.Video480ObjectKey,
+		item.Video720ObjectKey, item.LyricsEnObjectKey, item.LyricsZhObjectKey, item.LyricsBiObjectKey,
+		item.PosterObjectKey, item.AudioDurationMS, item.VideoDurationMS,
 		item.VideoWidth, item.VideoHeight, item.AudioCodec, item.VideoCodec,
 		item.ValidationStatus, nullableText(item.ValidationMessage))
 	return err
@@ -157,7 +162,8 @@ func scanMedia(row rowScanner) (model.MediaItem, error) {
 	var item model.MediaItem
 	err := row.Scan(
 		&item.ID, &item.SourceNo, &item.SourceCode, &item.Title, &item.TitleZH,
-		&item.AudioObjectKey, &item.VideoObjectKey, &item.LyricsObjectKey, &item.PosterObjectKey,
+		&item.AudioObjectKey, &item.Video480ObjectKey, &item.Video720ObjectKey,
+		&item.LyricsEnObjectKey, &item.LyricsZhObjectKey, &item.LyricsBiObjectKey, &item.PosterObjectKey,
 		&item.AudioDurationMS, &item.VideoDurationMS, &item.VideoWidth, &item.VideoHeight,
 		&item.AudioCodec, &item.VideoCodec, &item.ValidationStatus, &item.ValidationMessage,
 		&item.CreatedAt, &item.UpdatedAt,
@@ -166,8 +172,8 @@ func scanMedia(row rowScanner) (model.MediaItem, error) {
 		return model.MediaItem{}, err
 	}
 	item.HasAudio = item.AudioObjectKey != nil
-	item.HasVideo = item.VideoObjectKey != nil
-	item.HasLyrics = item.LyricsObjectKey != nil
+	item.HasVideo = item.Video480ObjectKey != nil || item.Video720ObjectKey != nil
+	item.HasLyrics = item.LyricsEnObjectKey != nil || item.LyricsZhObjectKey != nil || item.LyricsBiObjectKey != nil
 	item.HasPoster = item.PosterObjectKey != nil
 	item.Tags = []model.Tag{}
 	return item, nil

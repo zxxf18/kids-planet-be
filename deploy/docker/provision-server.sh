@@ -46,7 +46,10 @@ docker run --rm --network services-net \
   -e "APP_SECRET_KEY=$app_secret_key" \
   -v "$policy_file:/policy.json:ro" \
   --entrypoint /bin/sh "$mc_image" -c \
-  'mc admin policy add local kids-planet-readonly /policy.json >/dev/null &&
+  'for bucket in song video-480 video-720 lyrs lyrs-zh lyrs-bilingual poster; do
+     mc mb --ignore-existing "local/$bucket" >/dev/null
+   done &&
+   mc admin policy add local kids-planet-readonly /policy.json >/dev/null &&
    mc admin user add local "$APP_ACCESS_KEY" "$APP_SECRET_KEY" >/dev/null &&
    mc admin policy set local kids-planet-readonly user="$APP_ACCESS_KEY" >/dev/null'
 

@@ -24,10 +24,13 @@ type Config struct {
 			UseSSL           bool
 			URLExpiryMinutes int
 			Buckets          struct {
-				Audio  string
-				Video  string
-				Lyrics string
-				Poster string
+				Audio           string
+				Video480        string
+				Video720        string
+				LyricsEn        string
+				LyricsZh        string
+				LyricsBilingual string
+				Poster          string
 			}
 		}
 	}

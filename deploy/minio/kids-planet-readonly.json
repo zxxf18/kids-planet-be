@@ -9,8 +9,11 @@
       ],
       "Resource": [
         "arn:aws:s3:::song",
-        "arn:aws:s3:::video",
+        "arn:aws:s3:::video-480",
+        "arn:aws:s3:::video-720",
         "arn:aws:s3:::lyrs",
+        "arn:aws:s3:::lyrs-zh",
+        "arn:aws:s3:::lyrs-bilingual",
         "arn:aws:s3:::poster"
       ]
     },
@@ -21,8 +24,11 @@
       ],
       "Resource": [
         "arn:aws:s3:::song/*",
-        "arn:aws:s3:::video/*",
+        "arn:aws:s3:::video-480/*",
+        "arn:aws:s3:::video-720/*",
         "arn:aws:s3:::lyrs/*",
+        "arn:aws:s3:::lyrs-zh/*",
+        "arn:aws:s3:::lyrs-bilingual/*",
         "arn:aws:s3:::poster/*"
       ]
     }

@@ -20,10 +20,16 @@
 # media resources: keep directory placeholders only
 /resources/song/**
 !/resources/song/.gitkeep
-/resources/video/**
-!/resources/video/.gitkeep
+/resources/video_480/**
+!/resources/video_480/.gitkeep
+/resources/video_720/**
+!/resources/video_720/.gitkeep
 /resources/lyrs/**
 !/resources/lyrs/.gitkeep
+/resources/lyrs_zh/**
+!/resources/lyrs_zh/.gitkeep
+/resources/lyrs_bilingual/**
+!/resources/lyrs_bilingual/.gitkeep
 /resources/poster/**
 !/resources/poster/.gitkeep
 

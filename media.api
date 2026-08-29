@@ -28,8 +28,8 @@ type (
     validationStatus string `json:"validationStatus"`
     validationMessage string `json:"validationMessage"`
     audioUrl string `json:"audioUrl"`
-    videoUrl string `json:"videoUrl"`
-    lyricsUrl string `json:"lyricsUrl"`
+    videoSources map[string]string `json:"videoSources"`
+    lyricsSources map[string]string `json:"lyricsSources"`
     posterUrl string `json:"posterUrl"`
   }
 

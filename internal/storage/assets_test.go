@@ -21,7 +21,16 @@ func TestLocalPosterUsesResourceRoot(t *testing.T) {
 }
 
 func TestLocalKindUsesTextLyrics(t *testing.T) {
-	if actual := localKind("lyrs/001. Song.lrc"); actual != "lyrics" {
-		t.Fatalf("lrc kind = %q, want lyrics", actual)
+	tests := map[string]string{
+		"lyrs/001. Song.lrc":           "lyricsEn",
+		"lyrs_zh/001. Song.lrc":        "lyricsZh",
+		"lyrs_bilingual/001. Song.lrc": "lyricsBilingual",
+		"video_480/001. Song.mp4":      "video480",
+		"video_720/001. Song.mp4":      "video720",
+	}
+	for key, expected := range tests {
+		if actual := localKind(key); actual != expected {
+			t.Fatalf("localKind(%q) = %q, want %q", key, actual, expected)
+		}
 	}
 }

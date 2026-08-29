@@ -37,10 +37,13 @@ func NewAssets(cfg config.Config, prober *media.Prober) (*Assets, error) {
 		prefix:        strings.Trim(cfg.Storage.MinIO.Prefix, "/"),
 		expiry:        time.Duration(cfg.Storage.MinIO.URLExpiryMinutes) * time.Minute,
 		buckets: map[string]string{
-			"audio":  cfg.Storage.MinIO.Buckets.Audio,
-			"video":  cfg.Storage.MinIO.Buckets.Video,
-			"lyrics": cfg.Storage.MinIO.Buckets.Lyrics,
-			"poster": cfg.Storage.MinIO.Buckets.Poster,
+			"audio":           cfg.Storage.MinIO.Buckets.Audio,
+			"video480":        cfg.Storage.MinIO.Buckets.Video480,
+			"video720":        cfg.Storage.MinIO.Buckets.Video720,
+			"lyricsEn":        cfg.Storage.MinIO.Buckets.LyricsEn,
+			"lyricsZh":        cfg.Storage.MinIO.Buckets.LyricsZh,
+			"lyricsBilingual": cfg.Storage.MinIO.Buckets.LyricsBilingual,
+			"poster":          cfg.Storage.MinIO.Buckets.Poster,
 		},
 	}
 	if assets.expiry <= 0 {
@@ -56,7 +59,7 @@ func NewAssets(cfg config.Config, prober *media.Prober) (*Assets, error) {
 	if cfg.Storage.MinIO.Endpoint == "" || cfg.Storage.MinIO.AccessKey == "" || cfg.Storage.MinIO.SecretKey == "" {
 		return nil, fmt.Errorf("minio mode requires endpoint, access key and secret key")
 	}
-	for _, kind := range []string{"audio", "video", "lyrics", "poster"} {
+	for _, kind := range assetKinds() {
 		bucket := assets.buckets[kind]
 		if strings.TrimSpace(bucket) == "" {
 			return nil, fmt.Errorf("minio mode requires a bucket for %s", kind)
@@ -128,7 +131,7 @@ func (a *Assets) ListResources(ctx context.Context, subPath string) ([]media.Res
 		return a.listLocal(cleanSubPath)
 	}
 	entries := make([]media.ResourceEntry, 0, 1024)
-	for _, kind := range []string{"audio", "video", "lyrics", "poster"} {
+	for _, kind := range assetKinds() {
 		bucket := a.bucket(kind)
 		listPrefix := a.objectKey(cleanSubPath)
 		for object := range a.minio.ListObjects(ctx, bucket, minio.ListObjectsOptions{Prefix: listPrefix, Recursive: true}) {
@@ -202,9 +205,24 @@ func localKind(key string) string {
 	case ".mp3":
 		return "audio"
 	case ".mp4":
-		return "video"
+		if parent == "video_480" || parent == "video-480" {
+			return "video480"
+		}
+		if parent == "video_720" || parent == "video-720" {
+			return "video720"
+		}
+		return ""
 	case ".lrc", ".txt":
-		return "lyrics"
+		switch parent {
+		case "lyrs", "lyrics_en", "lyrics-en":
+			return "lyricsEn"
+		case "lyrs_zh", "lyrs-zh", "lyrics_zh", "lyrics-zh":
+			return "lyricsZh"
+		case "lyrs_bilingual", "lyrs-bilingual", "lyrics_bilingual", "lyrics-bilingual":
+			return "lyricsBilingual"
+		default:
+			return ""
+		}
 	case ".jpg", ".jpeg", ".png", ".webp":
 		if parent == "poster" || parent == "cover" || parent == "covers" {
 			return "poster"
@@ -213,6 +231,10 @@ func localKind(key string) string {
 	default:
 		return ""
 	}
+}
+
+func assetKinds() []string {
+	return []string{"audio", "video480", "video720", "lyricsEn", "lyricsZh", "lyricsBilingual", "poster"}
 }
 
 func (a *Assets) bucket(kind string) string { return strings.TrimSpace(a.buckets[kind]) }

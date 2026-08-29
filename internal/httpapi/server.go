@@ -111,17 +111,21 @@ func (a *API) mediaContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	kind := r.URL.Query().Get("kind")
-	key := objectKey(item, kind)
+	storageKind, key, err := objectKey(item, kind, r.URL.Query().Get("quality"), r.URL.Query().Get("language"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	if key == "" {
 		writeError(w, http.StatusNotFound, "requested media type is unavailable")
 		return
 	}
-	if kind == "lyrics" {
+	if strings.HasPrefix(storageKind, "lyrics") {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Header().Set("Cache-Control", "public, max-age=3600")
 	}
 	if a.assets.IsLocal() {
-		localPath, err := a.assets.LocalPath(kind, key)
+		localPath, err := a.assets.LocalPath(storageKind, key)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
@@ -129,7 +133,7 @@ func (a *API) mediaContent(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, localPath)
 		return
 	}
-	object, info, err := a.assets.Open(r.Context(), kind, key)
+	object, info, err := a.assets.Open(r.Context(), storageKind, key)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
@@ -139,7 +143,7 @@ func (a *API) mediaContent(w http.ResponseWriter, r *http.Request) {
 	if contentType == "" || contentType == "application/octet-stream" {
 		contentType = mime.TypeByExtension(path.Ext(key))
 	}
-	if contentType != "" && kind != "lyrics" {
+	if contentType != "" && !strings.HasPrefix(storageKind, "lyrics") {
 		w.Header().Set("Content-Type", contentType)
 	}
 	if info.ETag != "" {
@@ -147,8 +151,8 @@ func (a *API) mediaContent(w http.ResponseWriter, r *http.Request) {
 	}
 	if kind == "poster" {
 		w.Header().Set("Cache-Control", "public, max-age=86400")
-	} else if kind == "lyrics" {
-		w.Header().Set("Cache-Control", "public, max-age=3600")
+	} else if strings.HasPrefix(storageKind, "lyrics") {
+		w.Header().Set("Cache-Control", "public, max-age=86400")
 	} else {
 		w.Header().Set("Cache-Control", "public, max-age=3600")
 	}
@@ -232,34 +236,66 @@ func (a *API) attachURLs(item *model.MediaItem) {
 		item.AudioURL = base + "audio"
 	}
 	if item.HasVideo {
-		item.VideoURL = base + "video"
+		item.VideoSources = make(map[string]string, 2)
+		if item.Video480ObjectKey != nil {
+			item.VideoSources["480"] = base + "video&quality=480"
+		}
+		if item.Video720ObjectKey != nil {
+			item.VideoSources["720"] = base + "video&quality=720"
+		}
 	}
 	if item.HasLyrics {
-		item.LyricsURL = base + "lyrics"
+		item.LyricsSources = make(map[string]string, 3)
+		if item.LyricsEnObjectKey != nil {
+			item.LyricsSources["en"] = base + "lyrics&language=en"
+		}
+		if item.LyricsZhObjectKey != nil {
+			item.LyricsSources["zh"] = base + "lyrics&language=zh"
+		}
+		if item.LyricsBiObjectKey != nil {
+			item.LyricsSources["bilingual"] = base + "lyrics&language=bilingual"
+		}
 	}
 	if item.HasPoster {
 		item.PosterURL = base + "poster"
 	}
 }
 
-func objectKey(item model.MediaItem, kind string) string {
+func objectKey(item model.MediaItem, kind, quality, language string) (string, string, error) {
 	var value *string
+	storageKind := kind
 	switch kind {
 	case "audio":
 		value = item.AudioObjectKey
 	case "video":
-		value = item.VideoObjectKey
+		switch quality {
+		case "480":
+			storageKind, value = "video480", item.Video480ObjectKey
+		case "720":
+			storageKind, value = "video720", item.Video720ObjectKey
+		default:
+			return "", "", fmt.Errorf("quality must be 480 or 720")
+		}
 	case "lyrics":
-		value = item.LyricsObjectKey
+		switch language {
+		case "en":
+			storageKind, value = "lyricsEn", item.LyricsEnObjectKey
+		case "zh":
+			storageKind, value = "lyricsZh", item.LyricsZhObjectKey
+		case "bilingual":
+			storageKind, value = "lyricsBilingual", item.LyricsBiObjectKey
+		default:
+			return "", "", fmt.Errorf("language must be en, zh or bilingual")
+		}
 	case "poster":
 		value = item.PosterObjectKey
 	default:
-		return ""
+		return "", "", fmt.Errorf("unsupported media kind")
 	}
 	if value == nil {
-		return ""
+		return storageKind, "", nil
 	}
-	return *value
+	return storageKind, *value, nil
 }
 
 func parseIDs(value string) ([]int64, error) {

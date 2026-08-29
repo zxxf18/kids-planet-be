@@ -23,6 +23,9 @@ Storage:
     URLExpiryMinutes: 60
     Buckets:
       Audio: song
-      Video: video
-      Lyrics: lyrs
+      Video480: video-480
+      Video720: video-720
+      LyricsEn: lyrs
+      LyricsZh: lyrs-zh
+      LyricsBilingual: lyrs-bilingual
       Poster: poster

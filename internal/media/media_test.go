@@ -21,7 +21,7 @@ func (fakeResourceSource) ProbeResource(_ context.Context, kind, key string) (Pr
 	result := ProbeResult{ResourcePath: key, DurationMS: 1000}
 	if kind == "audio" {
 		result.AudioCodec = "mp3"
-	} else {
+	} else if kind == "video480" || kind == "video720" {
 		result.VideoCodec = "h264"
 		result.Width = 1920
 		result.Height = 1080
@@ -59,8 +59,8 @@ func TestCandidateNeedsPlayableMedia(t *testing.T) {
 		playable bool
 	}{
 		{name: "audio only", item: candidate{audio: "song/001.mp3"}, playable: true},
-		{name: "video only", item: candidate{video: "video/001.mp4"}, playable: true},
-		{name: "lyrics only", item: candidate{lyrics: "lyrs/001.lrc"}, playable: false},
+		{name: "video only", item: candidate{video480: "video_480/001.mp4"}, playable: true},
+		{name: "lyrics only", item: candidate{lyricsEn: "lyrs/001.lrc"}, playable: false},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -75,8 +75,11 @@ func TestCandidateNeedsPlayableMedia(t *testing.T) {
 func TestScannerReadsS3StyleResources(t *testing.T) {
 	source := fakeResourceSource{entries: []ResourceEntry{
 		{Kind: "audio", Key: "001. Five Little Monkeys.mp3", Name: "001. Five Little Monkeys.mp3"},
-		{Kind: "video", Key: "001. Five Little Monkeys.mp4", Name: "001. Five Little Monkeys.mp4"},
-		{Kind: "lyrics", Key: "001. Five Little Monkeys.lrc", Name: "001. Five Little Monkeys.lrc"},
+		{Kind: "video480", Key: "001. Five Little Monkeys.mp4", Name: "001. Five Little Monkeys.mp4"},
+		{Kind: "video720", Key: "001. Five Little Monkeys.mp4", Name: "001. Five Little Monkeys.mp4"},
+		{Kind: "lyricsEn", Key: "001. Five Little Monkeys.lrc", Name: "001. Five Little Monkeys.lrc"},
+		{Kind: "lyricsZh", Key: "001. Five Little Monkeys.lrc", Name: "001. Five Little Monkeys.lrc"},
+		{Kind: "lyricsBilingual", Key: "001. Five Little Monkeys.lrc", Name: "001. Five Little Monkeys.lrc"},
 		{Kind: "poster", Key: "001. Five Little Monkeys.jpg", Name: "001. Five Little Monkeys.jpg"},
 	}}
 	writer := &captureWriter{}
@@ -91,8 +94,8 @@ func TestScannerReadsS3StyleResources(t *testing.T) {
 	if item.AudioObjectKey == nil || *item.AudioObjectKey != "001. Five Little Monkeys.mp3" {
 		t.Fatalf("audio key = %v", item.AudioObjectKey)
 	}
-	if item.LyricsObjectKey == nil || *item.LyricsObjectKey != "001. Five Little Monkeys.lrc" {
-		t.Fatalf("lyrics key = %v", item.LyricsObjectKey)
+	if item.LyricsEnObjectKey == nil || *item.LyricsEnObjectKey != "001. Five Little Monkeys.lrc" {
+		t.Fatalf("lyrics key = %v", item.LyricsEnObjectKey)
 	}
 }
 

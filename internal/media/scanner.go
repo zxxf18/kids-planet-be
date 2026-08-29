@@ -50,13 +50,16 @@ type ScanIssue struct {
 }
 
 type candidate struct {
-	no     int
-	code   string
-	audio  string
-	video  string
-	lyrics string
-	poster string
-	titles map[string]string
+	no              int
+	code            string
+	audio           string
+	video480        string
+	video720        string
+	lyricsEn        string
+	lyricsZh        string
+	lyricsBilingual string
+	poster          string
+	titles          map[string]string
 }
 
 type namedImageCandidate struct {
@@ -85,10 +88,10 @@ func (s *Scanner) Scan(ctx context.Context, subPath string) (ScanResult, error) 
 			continue
 		}
 		kind := entry.Kind
-		if kind != "audio" && kind != "video" && kind != "lyrics" && kind != "poster" {
+		if !supportedResourceKind(kind) {
 			continue
 		}
-		if kind == "lyrics" {
+		if isLyricsKind(kind) {
 			ext := strings.ToLower(path.Ext(name))
 			if ext != ".lrc" && ext != ".txt" {
 				continue
@@ -106,7 +109,7 @@ func (s *Scanner) Scan(ctx context.Context, subPath string) (ScanResult, error) 
 		}
 		relative := entry.Key
 		title := cleanTitle(strings.TrimSuffix(name, path.Ext(name)))
-		if kind == "lyrics" || kind == "poster" {
+		if isCompanionKind(kind) {
 			images = append(images, namedImageCandidate{no: no, code: match[1], kind: kind, path: relative, title: title})
 			continue
 		}
@@ -119,16 +122,15 @@ func (s *Scanner) Scan(ctx context.Context, subPath string) (ScanResult, error) 
 		switch kind {
 		case "audio":
 			item.audio = relative
-		case "video":
-			item.video = relative
+		case "video480":
+			item.video480 = relative
+		case "video720":
+			item.video720 = relative
 		}
 	}
 	for _, image := range images {
 		item := matchNamedImage(items, image)
-		label := "文字歌词"
-		if image.kind == "poster" {
-			label = "封面图片"
-		}
+		label := companionLabel(image.kind)
 		if item == nil {
 			result.Issues = append(result.Issues, ScanIssue{
 				SourceCode: image.code,
@@ -137,9 +139,18 @@ func (s *Scanner) Scan(ctx context.Context, subPath string) (ScanResult, error) 
 			})
 			continue
 		}
-		current := &item.lyrics
-		if image.kind == "poster" {
+		var current *string
+		switch image.kind {
+		case "lyricsEn":
+			current = &item.lyricsEn
+		case "lyricsZh":
+			current = &item.lyricsZh
+		case "lyricsBilingual":
+			current = &item.lyricsBilingual
+		case "poster":
 			current = &item.poster
+		default:
+			continue
 		}
 		if *current != "" {
 			result.Issues = append(result.Issues, ScanIssue{
@@ -158,7 +169,7 @@ func (s *Scanner) Scan(ctx context.Context, subPath string) (ScanResult, error) 
 		}
 		result.Issues = append(result.Issues, ScanIssue{
 			SourceCode: item.code,
-			Path:       item.lyrics,
+			Path:       item.lyricsEn,
 			Message:    "仅有配套资源，缺少可播放的音频或视频，已忽略",
 		})
 		delete(items, no)
@@ -193,11 +204,11 @@ func (s *Scanner) Scan(ctx context.Context, subPath string) (ScanResult, error) 
 }
 
 func hasPlayableMedia(item *candidate) bool {
-	return item != nil && (item.audio != "" || item.video != "")
+	return item != nil && (item.audio != "" || item.video480 != "" || item.video720 != "")
 }
 
 func matchNamedImage(items map[int]*candidate, image namedImageCandidate) *candidate {
-	if image.kind == "poster" || image.kind == "lyrics" {
+	if isCompanionKind(image.kind) {
 		return items[image.no]
 	}
 	title := normalizeTitle(image.title)
@@ -208,7 +219,7 @@ func matchNamedImage(items map[int]*candidate, image namedImageCandidate) *candi
 	sort.Ints(numbers)
 	for _, no := range numbers {
 		item := items[no]
-		for _, kind := range []string{"audio", "video"} {
+		for _, kind := range []string{"audio", "video720", "video480"} {
 			if title != "" && normalizeTitle(item.titles[kind]) == title {
 				return item
 			}
@@ -218,7 +229,7 @@ func matchNamedImage(items map[int]*candidate, image namedImageCandidate) *candi
 	if item == nil {
 		return nil
 	}
-	for _, kind := range []string{"audio", "video"} {
+	for _, kind := range []string{"audio", "video720", "video480"} {
 		if titleSimilarity(image.title, item.titles[kind]) >= 0.5 {
 			return item
 		}
@@ -264,11 +275,13 @@ func (s *Scanner) inspectCandidate(ctx context.Context, item *candidate) (model.
 	issues := make([]string, 0)
 	record := model.UpsertMedia{
 		SourceNo: item.no, SourceCode: item.code, Title: chooseTitle(item),
-		AudioObjectKey: optionalString(item.audio), VideoObjectKey: optionalString(item.video),
-		LyricsObjectKey: optionalString(item.lyrics),
-		PosterObjectKey: optionalString(item.poster), ValidationStatus: "ready",
+		AudioObjectKey:    optionalString(item.audio),
+		Video480ObjectKey: optionalString(item.video480), Video720ObjectKey: optionalString(item.video720),
+		LyricsEnObjectKey: optionalString(item.lyricsEn), LyricsZhObjectKey: optionalString(item.lyricsZh),
+		LyricsBiObjectKey: optionalString(item.lyricsBilingual),
+		PosterObjectKey:   optionalString(item.poster), ValidationStatus: "ready",
 	}
-	if item.audio == "" || item.video == "" || item.lyrics == "" || item.poster == "" {
+	if item.audio == "" || item.video480 == "" || item.video720 == "" || item.lyricsEn == "" || item.lyricsZh == "" || item.lyricsBilingual == "" || item.poster == "" {
 		record.ValidationStatus = "partial"
 	}
 	if item.audio != "" {
@@ -281,8 +294,12 @@ func (s *Scanner) inspectCandidate(ctx context.Context, item *candidate) (model.
 			record.AudioCodec = optionalString(probe.AudioCodec)
 		}
 	}
-	if item.video != "" {
-		probe, err := s.source.ProbeResource(ctx, "video", item.video)
+	videoKind, videoKey := "video720", item.video720
+	if videoKey == "" {
+		videoKind, videoKey = "video480", item.video480
+	}
+	if videoKey != "" {
+		probe, err := s.source.ProbeResource(ctx, videoKind, videoKey)
 		if err != nil {
 			issues = append(issues, "视频校验失败: "+err.Error())
 			record.ValidationStatus = "invalid"
@@ -311,12 +328,40 @@ func cleanTitle(stem string) string {
 }
 
 func chooseTitle(item *candidate) string {
-	for _, kind := range []string{"audio", "video", "lyrics"} {
+	for _, kind := range []string{"audio", "video720", "video480", "lyricsEn"} {
 		if title := strings.TrimSpace(item.titles[kind]); title != "" {
 			return title
 		}
 	}
 	return fmt.Sprintf("儿歌 %s", item.code)
+}
+
+func supportedResourceKind(kind string) bool {
+	switch kind {
+	case "audio", "video480", "video720", "lyricsEn", "lyricsZh", "lyricsBilingual", "poster":
+		return true
+	default:
+		return false
+	}
+}
+
+func isLyricsKind(kind string) bool {
+	return kind == "lyricsEn" || kind == "lyricsZh" || kind == "lyricsBilingual"
+}
+
+func isCompanionKind(kind string) bool { return isLyricsKind(kind) || kind == "poster" }
+
+func companionLabel(kind string) string {
+	switch kind {
+	case "lyricsEn":
+		return "英文歌词"
+	case "lyricsZh":
+		return "中文歌词"
+	case "lyricsBilingual":
+		return "中英文歌词"
+	default:
+		return "封面图片"
+	}
 }
 
 func optionalString(value string) *string {
