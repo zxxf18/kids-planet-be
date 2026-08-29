@@ -2,10 +2,11 @@ FROM golang:1.25-bookworm AS builder
 
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
+ARG GOPROXY=https://proxy.golang.org,direct
 
 WORKDIR /src
 COPY go.mod go.sum ./
-RUN go mod download
+RUN GOPROXY=${GOPROXY} go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -trimpath -ldflags="-s -w" -o /out/kids-planet-be ./cmd/server
